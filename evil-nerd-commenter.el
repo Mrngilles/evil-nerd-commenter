@@ -271,6 +271,28 @@ Please note it has NOT effect on evil text object!")
           (setq done t))
         ))))
 
+(defun evilnc--buffer-commenting (beg end mode func)
+  (let (comment-buffer text)
+    (setq comment-buffer (get-buffer-create (format "%s-comment" mode)))
+    (setq text (buffer-substring beg end))
+    (delete-region beg end)
+    (message "%s" (type-of text))
+    (with-current-buffer comment-buffer
+      (funcall mode)
+      (let (buf-b buf-e)
+	(insert text)
+	(setq buf-b (buffer-end -1))
+	(setq buf-e (buffer-end 1))
+	(evilnc--working-on-region buf-b buf-e func)
+	(setq buf-b (buffer-end -1))
+	(setq buf-e (buffer-end 1))
+	(setq text (buffer-substring buf-b buf-e))
+	(delete-region buf-b buf-e)
+      ))
+    (insert text)
+    ;; (insert-buffer-substring comment-buffer)
+    ))
+
 (defun evilnc--working-on-region (beg end fn)
   (let (pos
         info
@@ -288,26 +310,30 @@ Please note it has NOT effect on evil text object!")
       (setq lang-f (intern (concat lang "-mode")))
       )
 
-    ;; turn on 3rd party language's major-mode temporarily
-    (if lang-f (funcall lang-f))
+    ;; ;; turn on 3rd party language's major-mode temporarily
+    ;; (if lang-f (funcall lang-f))
 
-    (if evilnc-invert-comment-line-by-line
-        (evilnc--invert-comment beg end)
-      (funcall fn beg end))
+    (if lang-f
+	(evilnc--buffer-commenting beg end lang-f fn)
 
-    ;; turn off  3rd party language's major-mode temporarily and clean the shit
-    (when lang-f
-      ;; avoid org file automatically collapsed
-      (setq pos (point))
-      (org-mode)
-      ;; just goto the root element
-      (condition-case nil
-          (outline-up-heading 1)
-        (error
-       (message "in the beginning ...")))
-      ;; expand current node because by default (org-mode) will collapse all nodes
-      (org-show-subtree)
-      (goto-char pos))
+      (if evilnc-invert-comment-line-by-line
+	  (evilnc--invert-comment beg end)
+	(funcall fn beg end))
+      )
+
+    ;; ;; turn off  3rd party language's major-mode temporarily and clean the shit
+    ;; (when lang-f
+    ;;   ;; avoid org file automatically collapsed
+    ;;   (setq pos (point))
+    ;;   (org-mode)
+    ;;   ;; just goto the root element
+    ;;   (condition-case nil
+    ;;       (outline-up-heading 1)
+    ;;     (error
+    ;;    (message "in the beginning ...")))
+    ;;   ;; expand current node because by default (org-mode) will collapse all nodes
+    ;;   (org-show-subtree)
+    ;;   (goto-char pos))
     ))
 
 (defun evilnc--comment-or-uncomment-region (beg end)
